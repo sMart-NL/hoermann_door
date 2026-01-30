@@ -9,8 +9,9 @@
 #define CYCLE_TIME                1   // ms
 #define CYCLE_TIME_SLOW         100   // ms
 
+// 🔥 MOD: ESP32 als SLAVE (0x81) ipv UAP1 (0x28) - JOUW WIJZIGING!
 #define BROADCAST_ADDR            0x00
-#define UAP1_ADDR                 0x28
+#define ESP32_SLAVE_ADDR          0x81  // ← DIT IS DE MOD! (was UAP1_ADDR 0x28)
 #define UAP1_ADDR_MASTER          128
 
 #define UAP1_TYPE                 0x14
@@ -26,15 +27,12 @@ class UAPBridge_esp : public esphome::uapbridge::UAPBridge {
   public:
     // Enumeration for actions
     enum hoermann_action_t {
-      hoermann_action_stop          = 0x10FF, // thanks to https://github.com/avshrs/ESP32_Hormann_Supramatic_e3/blob/main/src/hoermann.h#L20 !
+      hoermann_action_stop          = 0x10FF, // thanks to https://github.com/avshrs/ESP32_Hormann_Supramatic_e3 !
       hoermann_action_open          = 0x1001,
       hoermann_action_close         = 0x1002,
       hoermann_action_impulse       = 0x1004,
       hoermann_action_toggle_light  = 0x1008,
       hoermann_action_venting       = 0x1010,
-    /*hoermann_action_test1         = 0x1020, //no reaction on my E3
-      hoermann_action_test2         = 0x1040,
-      hoermann_action_test3         = 0x1080,*/
       hoermann_action_none          = 0x1000
     };
 
@@ -55,9 +53,8 @@ class UAPBridge_esp : public esphome::uapbridge::UAPBridge {
   protected:
     hoermann_state_t state = hoermann_state_stopped;
     hoermann_action_t next_action = hoermann_action_none;
-    // state variables
     std::string state_string = "unknown";
-    // \state variables
+    
     // Internal methods
     void loop_fast();
     void loop_slow();
@@ -68,11 +65,12 @@ class UAPBridge_esp : public esphome::uapbridge::UAPBridge {
     void handle_state_change(hoermann_state_t new_state);
     char* print_data(uint8_t *p_data, uint8_t from, uint8_t to);
     void update_boolean_state(const char * name, bool &current_state, bool new_state);
+    
     // internal function variables
     uint32_t last_call       = 0;
     uint32_t last_call_slow   = 0;
     uint16_t broadcast_status = 0;
-    bool ignore_next_event = false;     // will also ignore wrong edge detection after reset
+    bool ignore_next_event = false;
     bool auto_correction_in_progress = false;
     uint8_t    rx_data[5]       = {0, 0, 0, 0, 0};
     uint8_t    tx_data[6]       = {0, 0, 0, 0, 0, 0};
