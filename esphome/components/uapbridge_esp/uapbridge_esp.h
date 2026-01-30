@@ -10,10 +10,11 @@
 #define CYCLE_TIME_SLOW         100   // ms
 
 #define BROADCAST_ADDR            0x00
-#define UAP1_ADDR                 0x81  →  #define ESP32_SLAVE_ADDR  0x81
-#define UAP1_ADDR_MASTER          128
+#define ESP32_SLAVE_ADDR          0x81  // 🔥 ESP32 (nieuwe slave)
+#define UAP1_SLAVE_ADDR           0x28  // UAP1 (origineel, blijft bestaan)
+#define MASTER_ADDR               128   // Master communiceert met BEIDE
 
-#define UAP1_TYPE                 0x14
+#define SLAVE_TYPE                0x14  // Algemeen slave type
 
 #define CMD_SLAVE_SCAN            0x01
 #define CMD_SLAVE_STATUS_REQUEST  0x20
