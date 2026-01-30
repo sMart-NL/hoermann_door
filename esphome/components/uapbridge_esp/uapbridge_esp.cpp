@@ -125,7 +125,7 @@ void UAPBridge_esp::receive() {
     // 28 82 01 80 06
     if (this->rx_data[0] == ESP32_SLAVE_ADDR) {
       length = this->rx_data[1] & 0x0F;
-      if (this->rx_data[2] == CMD_SLAVE_SCAN && this->rx_data[3] == UAP1_ADDR_MASTER && length == 2 && calc_crc8(this->rx_data, length + 3) == 0x00) {
+      if (this->rx_data[2] == CMD_SLAVE_SCAN && this->rx_data[3] == MASTER_ADDR && length == 2 && calc_crc8(this->rx_data, length + 3) == 0x00) {
         ESP_LOGVV(TAG, "SlaveScan: %s", print_data(this->rx_data, 0, 5));
         ESP_LOGV(TAG, "->      SlaveScan"); 
         counter = (this->rx_data[1] & 0xF0) + 0x10;
