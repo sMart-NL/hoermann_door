@@ -123,16 +123,16 @@ void UAPBridge_esp::receive() {
     newData = false;
     // Slave scan
     // 28 82 01 80 06
-    if (this->rx_data[0] == ESP32_SLAVE_ADDR) {
+    if (this->rx_data[0] == UAP1_ADDR) {
       length = this->rx_data[1] & 0x0F;
-      if (this->rx_data[2] == CMD_SLAVE_SCAN && this->rx_data[3] == MASTER_ADDR && length == 2 && calc_crc8(this->rx_data, length + 3) == 0x00) {
+      if (this->rx_data[2] == CMD_SLAVE_SCAN && this->rx_data[3] == UAP1_ADDR_MASTER && length == 2 && calc_crc8(this->rx_data, length + 3) == 0x00) {
         ESP_LOGVV(TAG, "SlaveScan: %s", print_data(this->rx_data, 0, 5));
         ESP_LOGV(TAG, "->      SlaveScan"); 
         counter = (this->rx_data[1] & 0xF0) + 0x10;
-        this->tx_data[0] = MASTER_ADDR;
+        this->tx_data[0] = UAP1_ADDR_MASTER;
         this->tx_data[1] = 0x02 | counter;
-        this->tx_data[2] = SLAVE_TYPE;
-        this->tx_data[3] = ESP32_SLAVE_ADDR;
+        this->tx_data[2] = UAP1_TYPE;
+        this->tx_data[3] = UAP1_ADDR;
         this->tx_data[4] = calc_crc8(this->tx_data, 4);
         this->tx_length = 5;
         this->send_time = millis();
@@ -151,13 +151,13 @@ void UAPBridge_esp::receive() {
     }
     // Slave status request (only 4 byte --> other indices of rx_data!)
     // 28 A1 20 2E
-    if (this->rx_data[1] == ESP32_SLAVE_ADDR) {
+    if (this->rx_data[1] == UAP1_ADDR) {
       length = this->rx_data[2] & 0x0F;
       if (this->rx_data[3] == CMD_SLAVE_STATUS_REQUEST && length == 1 && calc_crc8(&this->rx_data[1], length + 3) == 0x00) {
         ESP_LOGVV(TAG, "Slave status request: %s", print_data(this->rx_data, 1, 5));
         ESP_LOGV(TAG, "->      Slave status request");
         counter = (this->rx_data[2] & 0xF0) + 0x10;
-        this->tx_data[0] = MASTER_ADDR;
+        this->tx_data[0] = UAP1_ADDR_MASTER;
         this->tx_data[1] = 0x03 | counter;
         this->tx_data[2] = CMD_SLAVE_STATUS_RESPONSE;
         this->tx_data[3] = (uint8_t)(this->next_action & 0xFF);
@@ -346,4 +346,3 @@ void UAPBridge_esp::update_boolean_state(const char * name, bool &current_state,
 
 }  // namespace uapbridge_esp
 }  // namespace esphome
-
