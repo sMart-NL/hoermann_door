@@ -16,7 +16,10 @@ void UAPBridge::setup() {
 void UAPBridge::dump_config() {
   ESP_LOGCONFIG(TAG, "UAPBridge");
   if (this->rts_pin_ != nullptr) {
-    ESP_LOGCONFIG(TAG, "  RTS Pin: %s", this->rts_pin_->dump_summary().c_str());
+    char buf[32];
+this->rts_pin_->dump_summary(buf, sizeof(buf));
+ESP_LOGCONFIG(TAG, "  RTS Pin: %s", buf);
+
   }
   ESP_LOGCONFIG(TAG, "  Auto Correction: %s", this->auto_correction ? "true" : "false");
 }
