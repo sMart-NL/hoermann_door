@@ -1,0 +1,179 @@
+
+# -------------------------------------------------------------------
+# Binary sensors - GPIO for local control
+# -------------------------------------------------------------------
+binary_sensor:
+  # Lokale knoppen
+  - platform: gpio
+    pin:
+      number: 32
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: btn_open_local
+    internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      - lambda: 'id(garage_bridge).action_open();'
+
+  - platform: gpio
+    pin:
+      number: 33
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: btn_close_local
+    internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      - lambda: 'id(garage_bridge).action_close();'
+
+  - platform: gpio
+    pin:
+      number: 25
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: btn_vent_local
+    internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      - lambda: 'id(garage_bridge).action_venting();'
+
+  # Hoermann bridge states
+  - platform: uapbridge
+    relay_state:
+      name: "${relay_state}"
+      id: relay_state
+    error_state:
+      name: "${error_state}"
+      id: error_state
+    prewarn_state:
+      name: "${prewarn_state}"
+      id: prewarn_state
+    got_valid_broadcast:
+      name: "${got_valid_broadcast}"
+      id: got_valid_broadcast
+
+  # Template status sensoren
+  - platform: template
+    name: "Garage Opened"
+    id: garage_open_status
+    lambda: 'return id(garage_bridge).get_state_string() == "Open";'
+
+  - platform: template
+    name: "Garage Closed"
+    id: garage_closed_status
+    lambda: 'return id(garage_bridge).get_state_string() == "Closed";'
+
+  - platform: template
+    name: "Garage Moving"
+    id: garage_moving_status
+    lambda: |-
+      auto s = id(garage_bridge).get_state_string();
+      return s == "Opening" || s == "Closing";
+
+  - platform: template
+    name: "Garage Venting"
+    id: garage_venting_status
+    lambda: 'return id(garage_bridge).get_state_string() == "Venting";'
+
+# -------------------------------------------------------------------
+# Text sensor
+# -------------------------------------------------------------------
+text_sensor:
+  - platform: uapbridge
+    id: garage_door_state
+    name: "${state}"
+
+# -------------------------------------------------------------------
+# GPIO switches - set unused to low / OFF to avoid floating
+# -------------------------------------------------------------------
+switch:
+  - platform: gpio
+    pin: 18
+    id: switch_18
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 19
+    id: switch_19
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 21
+    id: switch_21
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 22
+    id: switch_22
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 23
+    id: switch_23
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 26
+    id: switch_26
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 27
+    id: switch_27
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 0
+    id: switch_0
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio  
+    pin: 2
+    id: switch_2
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 12
+    id: switch_12
+    internal: true  
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    pin: 15
+    id: switch_15
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+# -------------------------------------------------------------------
+# Lamp output en licht 
+# -------------------------------------------------------------------
+output:
+  - platform: uapbridge
+    id: gd_light
+
+light:
+  - platform: uapbridge
+    id: my_light
+    name: "${light}"
+    output: gd_light
