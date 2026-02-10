@@ -1,0 +1,157 @@
+# -------------------------------------------------------------------
+# Covers
+# -------------------------------------------------------------------
+cover:
+  - platform: template
+    name: "${blind_name}"
+    id: garage_cover
+    device_class: garage
+    disabled_by_default: false
+    lambda: |-
+      auto s = id(garage_bridge).get_state_string();
+      if (s == "Open") return COVER_OPEN;
+      if (s == "Closed") return COVER_CLOSED;
+      return COVER_OPEN;
+    open_action:
+      - if:
+          condition:
+            binary_sensor.is_off: garage_moving_status
+          then:
+            - lambda: 'id(garage_bridge).action_open();'
+    close_action:
+      - if:
+          condition:
+            binary_sensor.is_off: garage_moving_status
+          then:
+            - lambda: 'id(garage_bridge).action_close();'
+    stop_action:
+      - lambda: 'id(garage_bridge).action_stop();'
+
+
+# -------------------------------------------------------------------
+# Actieknoppen
+# -------------------------------------------------------------------
+
+button:
+  - platform: template
+    name: "${friendly_name} Open"
+    disabled_by_default: false
+    on_press:
+      - if:
+          condition:
+            binary_sensor.is_off: garage_moving_status
+          then:
+            - lambda: 'id(garage_bridge).action_open();'
+
+  - platform: template
+    name: "${friendly_name} Close"
+    disabled_by_default: false
+    on_press:
+      - if:
+          condition:
+            binary_sensor.is_off: garage_moving_status
+          then:
+            - lambda: 'id(garage_bridge).action_close();'
+
+  - platform: template
+    name: "${friendly_name} Stop"
+    disabled_by_default: false
+    on_press:
+      - lambda: 'id(garage_bridge).action_stop();'
+
+  - platform: template
+    name: "${friendly_name} Venting"
+    disabled_by_default: false
+    on_press:
+      - if:
+          condition:
+            binary_sensor.is_on: garage_moving_status
+          then:
+            - lambda: 'id(garage_bridge).action_stop();'
+          else:
+            - if:
+                condition:
+                  binary_sensor.is_on: garage_venting_status
+                then:
+                  - lambda: 'id(garage_bridge).action_close();'
+                else:
+                  - lambda: 'id(garage_bridge).action_venting();'
+
+  - platform: template
+    name: "${btn_impulse}"
+    on_press:
+      - lambda: 'id(garage_bridge).action_impulse();'
+
+
+
+# -------------------------------------------------------------------
+# Binary sensors - GPIO for local control
+# -------------------------------------------------------------------
+binary_sensor:
+  # Lokale knoppen
+  - platform: gpio
+    pin:
+      number: 32
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: btn_open_local
+    internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      - if:
+          condition:
+            binary_sensor.is_off: garage_moving_status
+          then:
+            - lambda: 'id(garage_bridge).action_open();'
+
+
+  - platform: gpio
+    pin:
+      number: 33
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: btn_close_local
+    internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      - if:
+          condition:
+            binary_sensor.is_off: garage_moving_status
+          then:
+            - lambda: 'id(garage_bridge).action_close();'
+
+
+  - platform: gpio
+    pin:
+      number: 25
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: btn_vent_local
+    internal: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      - if:
+          condition:
+            binary_sensor.is_on: garage_moving_status
+          then:
+            - lambda: 'id(garage_bridge).action_stop();'
+          else:
+            - if:
+                condition:
+                  binary_sensor.is_on: garage_venting_status
+                then:
+                  - lambda: 'id(garage_bridge).action_close();'
+                else:
+                  - lambda: 'id(garage_bridge).action_venting();'
