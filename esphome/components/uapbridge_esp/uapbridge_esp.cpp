@@ -226,13 +226,29 @@ void UAPBridge_esp::set_command(bool cond, const hoermann_action_t command) {
 }
 
 void UAPBridge_esp::action_open() {
-  ESP_LOGD(TAG, "Action: open called");
-  this->set_command(this->state != hoermann_state_open, hoermann_action_open);
+  ESP_LOGD(TAG, "Action: open called (state=%d)", this->state);
+
+  if (this->state == hoermann_state_closed ||
+      this->state == hoermann_state_stopped) {
+
+    this->set_command(true, hoermann_action_open);
+
+  } else {
+    ESP_LOGW(TAG, "Open BLOCKED: state=%d", this->state);
+  }
 }
 
 void UAPBridge_esp::action_close() {
-  ESP_LOGD(TAG, "Action: close called");
-  this->set_command(this->state != hoermann_state_closed, hoermann_action_close);
+  ESP_LOGD(TAG, "Action: close called (state=%d)", this->state);
+
+  if (this->state == hoermann_state_open ||
+      this->state == hoermann_state_stopped) {
+
+    this->set_command(true, hoermann_action_close);
+
+  } else {
+    ESP_LOGW(TAG, "Close BLOCKED: state=%d", this->state);
+  }
 }
 
 void UAPBridge_esp::action_stop() {
