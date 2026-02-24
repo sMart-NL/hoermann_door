@@ -29,12 +29,14 @@ void UAPBridge_esp::loop_fast()
 {
   receive();
 
-  if (millis() - last_call < CYCLE_TIME)
+  uint32_t now = millis();
+
+  if (now - last_call < CYCLE_TIME)
     return;
 
-  last_call = millis();
+  last_call = now;
 
-  if (send_time != 0 && millis() >= send_time)
+  if (send_time != 0 && now >= send_time)
   {
     transmit();
     send_time = 0;
@@ -54,31 +56,25 @@ void UAPBridge_esp::loop_slow()
 
   last_call_slow = now;
 
-  /* Latch protection */
-
+  /* latch protection */
   if (command_latch_active && now < command_latch_time)
     return;
 
-  /* Decode broadcast state */
-
+  /* decode state */
   hoermann_state_t candidate = hoermann_state_stopped;
 
   if (broadcast_status & hoermann_state_open)
     candidate = hoermann_state_open;
   else if (broadcast_status & hoermann_state_closed)
     candidate = hoermann_state_closed;
-  else if ((broadcast_status &
-            (hoermann_state_direction | hoermann_state_moving))
-            == hoermann_state_opening)
+  else if ((broadcast_status & (hoermann_state_direction | hoermann_state_moving))
+           == hoermann_state_opening)
     candidate = hoermann_state_opening;
-  else if ((broadcast_status &
-            (hoermann_state_direction | hoermann_state_moving))
-            == hoermann_state_closing)
+  else if ((broadcast_status & (hoermann_state_direction | hoermann_state_moving))
+           == hoermann_state_closing)
     candidate = hoermann_state_closing;
   else if (broadcast_status & hoermann_state_venting)
     candidate = hoermann_state_venting;
-
-  /* Stability filter */
 
   if (candidate != candidate_state)
   {
@@ -93,7 +89,7 @@ void UAPBridge_esp::loop_slow()
   if (candidate != state)
     handle_state_change(candidate);
 
-  /* Boolean telemetry */
+  /* telemetry */
 
   update_boolean_state("relay", relay_enabled,
                        broadcast_status & hoermann_state_opt_relay);
@@ -110,7 +106,7 @@ void UAPBridge_esp::loop_slow()
   update_boolean_state("prewarn", prewarn_state,
                        broadcast_status & hoermann_state_prewarn);
 
-  /* Auto correction */
+  /* auto correction */
 
   if (!auto_correction)
     return;
@@ -213,17 +209,64 @@ void UAPBridge_esp::transmit()
 }
 
 /* ============================================================
-   LIGHT CONTROL (LINKER FIX)
+   ACTIONS
 ============================================================ */
 
-void UAPBridge_esp::set_light(bool state)
+void UAPBridge_esp::action_open()
 {
-  if (light_enabled == state)
+  if (!(state == hoermann_state_closed ||
+        state == hoermann_state_stopped))
     return;
 
-  set_command(true, hoermann_action_toggle_light);
+  set_command(true, hoermann_action_open);
+}
 
-  ESP_LOGD(TAG, "Light state set to %s", state ? "ON" : "OFF");
+void UAPBridge_esp::action_close()
+{
+  if (!(state == hoermann_state_open ||
+        state == hoermann_state_stopped))
+    return;
+
+  set_command(true, hoermann_action_close);
+}
+
+void UAPBridge_esp::action_stop()
+{
+  set_command(state == hoermann_state_opening ||
+              state == hoermann_state_closing,
+              hoermann_action_stop);
+}
+
+void UAPBridge_esp::action_toggle_light()
+{
+  set_command(true, hoermann_action_toggle_light);
+}
+
+void UAPBridge_esp::action_impulse()
+{
+  set_command(true, hoermann_action_impulse);
+}
+
+/* ============================================================
+   PUBLIC API
+============================================================ */
+
+UAPBridge_esp::hoermann_state_t UAPBridge_esp::get_state()
+{
+  return state;
+}
+
+std::string UAPBridge_esp::get_state_string()
+{
+  return state_string;
+}
+
+void UAPBridge_esp::set_venting(bool enable)
+{
+  if (enable)
+    set_command(true, hoermann_action_venting);
+  else
+    set_command(true, hoermann_action_close);
 }
 
 /* ============================================================
@@ -236,33 +279,13 @@ void UAPBridge_esp::handle_state_change(hoermann_state_t new_state)
 
   switch (new_state)
   {
-    case hoermann_state_open:
-      state_string = "Open";
-      break;
-
-    case hoermann_state_closed:
-      state_string = "Closed";
-      break;
-
-    case hoermann_state_opening:
-      state_string = "Opening";
-      break;
-
-    case hoermann_state_closing:
-      state_string = "Closing";
-      break;
-
-    case hoermann_state_venting:
-      state_string = "Venting";
-      break;
-
-    case hoermann_state_stopped:
-      state_string = "Stopped";
-      break;
-
-    default:
-      state_string = "Error";
-      break;
+    case hoermann_state_open: state_string = "Open"; break;
+    case hoermann_state_closed: state_string = "Closed"; break;
+    case hoermann_state_opening: state_string = "Opening"; break;
+    case hoermann_state_closing: state_string = "Closing"; break;
+    case hoermann_state_venting: state_string = "Venting"; break;
+    case hoermann_state_stopped: state_string = "Stopped"; break;
+    default: state_string = "Error"; break;
   }
 
   data_has_changed = true;
