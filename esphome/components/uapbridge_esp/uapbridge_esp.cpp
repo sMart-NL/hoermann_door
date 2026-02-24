@@ -6,7 +6,7 @@ namespace uapbridge_esp {
 static const char *const TAG = "uapbridge_esp";
 
 /* ============================================================
-   MAIN LOOP
+   LOOP
 ============================================================ */
 
 void UAPBridge_esp::loop()
@@ -29,14 +29,12 @@ void UAPBridge_esp::loop_fast()
 {
   receive();
 
-  uint32_t now = millis();
-
-  if (now - last_call < CYCLE_TIME)
+  if (millis() - last_call < CYCLE_TIME)
     return;
 
-  last_call = now;
+  last_call = millis();
 
-  if (send_time != 0 && now >= send_time)
+  if (send_time != 0 && millis() >= send_time)
   {
     transmit();
     send_time = 0;
@@ -55,58 +53,6 @@ void UAPBridge_esp::loop_slow()
     return;
 
   last_call_slow = now;
-
-  /* latch protection */
-  if (command_latch_active && now < command_latch_time)
-    return;
-
-  /* decode state */
-  hoermann_state_t candidate = hoermann_state_stopped;
-
-  if (broadcast_status & hoermann_state_open)
-    candidate = hoermann_state_open;
-  else if (broadcast_status & hoermann_state_closed)
-    candidate = hoermann_state_closed;
-  else if ((broadcast_status & (hoermann_state_direction | hoermann_state_moving))
-           == hoermann_state_opening)
-    candidate = hoermann_state_opening;
-  else if ((broadcast_status & (hoermann_state_direction | hoermann_state_moving))
-           == hoermann_state_closing)
-    candidate = hoermann_state_closing;
-  else if (broadcast_status & hoermann_state_venting)
-    candidate = hoermann_state_venting;
-
-  if (candidate != candidate_state)
-  {
-    candidate_state = candidate;
-    candidate_state_time = now;
-    return;
-  }
-
-  if (now - candidate_state_time < BROADCAST_STABLE_MS)
-    return;
-
-  if (candidate != state)
-    handle_state_change(candidate);
-
-  /* telemetry */
-
-  update_boolean_state("relay", relay_enabled,
-                       broadcast_status & hoermann_state_opt_relay);
-
-  update_boolean_state("light", light_enabled,
-                       broadcast_status & hoermann_state_light_relay);
-
-  update_boolean_state("vent", venting_enabled,
-                       broadcast_status & hoermann_state_venting);
-
-  update_boolean_state("err", error_state,
-                       broadcast_status & hoermann_state_error);
-
-  update_boolean_state("prewarn", prewarn_state,
-                       broadcast_status & hoermann_state_prewarn);
-
-  /* auto correction */
 
   if (!auto_correction)
     return;
@@ -136,13 +82,10 @@ void UAPBridge_esp::loop_slow()
     set_command(true, hoermann_action_close);
 
   auto_correction_executed = true;
-
-  command_latch_active = true;
-  command_latch_time = now + COMMAND_LATCH_MS;
 }
 
 /* ============================================================
-   UART RECEIVE
+   RECEIVE
 ============================================================ */
 
 void UAPBridge_esp::receive()
@@ -209,56 +152,15 @@ void UAPBridge_esp::transmit()
 }
 
 /* ============================================================
-   ACTIONS
+   STATE HELPERS (LINKER SAFE)
 ============================================================ */
 
-void UAPBridge_esp::action_open()
+void UAPBridge_esp::set_light(bool state)
 {
-  if (!(state == hoermann_state_closed ||
-        state == hoermann_state_stopped))
+  if (light_enabled == state)
     return;
 
-  set_command(true, hoermann_action_open);
-}
-
-void UAPBridge_esp::action_close()
-{
-  if (!(state == hoermann_state_open ||
-        state == hoermann_state_stopped))
-    return;
-
-  set_command(true, hoermann_action_close);
-}
-
-void UAPBridge_esp::action_stop()
-{
-  set_command(state == hoermann_state_opening ||
-              state == hoermann_state_closing,
-              hoermann_action_stop);
-}
-
-void UAPBridge_esp::action_toggle_light()
-{
   set_command(true, hoermann_action_toggle_light);
-}
-
-void UAPBridge_esp::action_impulse()
-{
-  set_command(true, hoermann_action_impulse);
-}
-
-/* ============================================================
-   PUBLIC API
-============================================================ */
-
-UAPBridge_esp::hoermann_state_t UAPBridge_esp::get_state()
-{
-  return state;
-}
-
-std::string UAPBridge_esp::get_state_string()
-{
-  return state_string;
 }
 
 void UAPBridge_esp::set_venting(bool enable)
@@ -269,8 +171,23 @@ void UAPBridge_esp::set_venting(bool enable)
     set_command(true, hoermann_action_close);
 }
 
+void UAPBridge_esp::action_impulse()
+{
+  set_command(true, hoermann_action_impulse);
+}
+
+hoermann_state_t UAPBridge_esp::get_state()
+{
+  return state;
+}
+
+std::string UAPBridge_esp::get_state_string()
+{
+  return state_string;
+}
+
 /* ============================================================
-   STATE CHANGE
+   STATE MACHINE
 ============================================================ */
 
 void UAPBridge_esp::handle_state_change(hoermann_state_t new_state)
@@ -279,13 +196,33 @@ void UAPBridge_esp::handle_state_change(hoermann_state_t new_state)
 
   switch (new_state)
   {
-    case hoermann_state_open: state_string = "Open"; break;
-    case hoermann_state_closed: state_string = "Closed"; break;
-    case hoermann_state_opening: state_string = "Opening"; break;
-    case hoermann_state_closing: state_string = "Closing"; break;
-    case hoermann_state_venting: state_string = "Venting"; break;
-    case hoermann_state_stopped: state_string = "Stopped"; break;
-    default: state_string = "Error"; break;
+    case hoermann_state_open:
+      state_string = "Open";
+      break;
+
+    case hoermann_state_closed:
+      state_string = "Closed";
+      break;
+
+    case hoermann_state_opening:
+      state_string = "Opening";
+      break;
+
+    case hoermann_state_closing:
+      state_string = "Closing";
+      break;
+
+    case hoermann_state_venting:
+      state_string = "Venting";
+      break;
+
+    case hoermann_state_stopped:
+      state_string = "Stopped";
+      break;
+
+    default:
+      state_string = "Error";
+      break;
   }
 
   data_has_changed = true;
