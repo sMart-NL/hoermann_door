@@ -9,12 +9,13 @@ static const char *const TAG = "uapbridge_esp";
    MAIN LOOP
 ============================================================ */
 
-void UAPBridge_esp::loop() {
-
+void UAPBridge_esp::loop()
+{
   loop_fast();
   loop_slow();
 
-  if (data_has_changed) {
+  if (data_has_changed)
+  {
     clear_data_changed_flag();
     state_callback_.call();
   }
@@ -24,8 +25,8 @@ void UAPBridge_esp::loop() {
    FAST LOOP
 ============================================================ */
 
-void UAPBridge_esp::loop_fast() {
-
+void UAPBridge_esp::loop_fast()
+{
   receive();
 
   if (millis() - last_call < CYCLE_TIME)
@@ -33,7 +34,8 @@ void UAPBridge_esp::loop_fast() {
 
   last_call = millis();
 
-  if (send_time != 0 && millis() >= send_time) {
+  if (send_time != 0 && millis() >= send_time)
+  {
     transmit();
     send_time = 0;
   }
@@ -43,24 +45,21 @@ void UAPBridge_esp::loop_fast() {
    SLOW LOOP
 ============================================================ */
 
-void UAPBridge_esp::loop_slow() {
+void UAPBridge_esp::loop_slow()
+{
+  uint32_t now = millis();
 
-  if (millis() - last_call_slow < CYCLE_TIME_SLOW)
+  if (now - last_call_slow < CYCLE_TIME_SLOW)
     return;
 
-  last_call_slow = millis();
+  last_call_slow = now;
 
-  /* =====================================================
-     Safety latch protection
-  ===================================================== */
+  /* Latch protection */
 
-  if (command_latch_active &&
-      millis() < command_latch_time)
+  if (command_latch_active && now < command_latch_time)
     return;
 
-  /* =====================================================
-     Decode broadcast state
-  ===================================================== */
+  /* Decode broadcast state */
 
   hoermann_state_t candidate = hoermann_state_stopped;
 
@@ -69,73 +68,67 @@ void UAPBridge_esp::loop_slow() {
   else if (broadcast_status & hoermann_state_closed)
     candidate = hoermann_state_closed;
   else if ((broadcast_status &
-           (hoermann_state_direction |
-            hoermann_state_moving))
-           == hoermann_state_opening)
+            (hoermann_state_direction | hoermann_state_moving))
+            == hoermann_state_opening)
     candidate = hoermann_state_opening;
   else if ((broadcast_status &
-           (hoermann_state_direction |
-            hoermann_state_moving))
-           == hoermann_state_closing)
+            (hoermann_state_direction | hoermann_state_moving))
+            == hoermann_state_closing)
     candidate = hoermann_state_closing;
   else if (broadcast_status & hoermann_state_venting)
     candidate = hoermann_state_venting;
 
   /* Stability filter */
 
-  if (candidate != candidate_state) {
+  if (candidate != candidate_state)
+  {
     candidate_state = candidate;
-    candidate_state_time = millis();
+    candidate_state_time = now;
     return;
   }
 
-  if (millis() - candidate_state_time < BROADCAST_STABLE_MS)
+  if (now - candidate_state_time < BROADCAST_STABLE_MS)
     return;
 
   if (candidate != state)
     handle_state_change(candidate);
 
-  /* =====================================================
-     Boolean updates
-  ===================================================== */
+  /* Boolean telemetry */
 
   update_boolean_state("relay", relay_enabled,
-                      broadcast_status & hoermann_state_opt_relay);
+                       broadcast_status & hoermann_state_opt_relay);
 
   update_boolean_state("light", light_enabled,
-                      broadcast_status & hoermann_state_light_relay);
+                       broadcast_status & hoermann_state_light_relay);
 
   update_boolean_state("vent", venting_enabled,
-                      broadcast_status & hoermann_state_venting);
+                       broadcast_status & hoermann_state_venting);
 
   update_boolean_state("err", error_state,
-                      broadcast_status & hoermann_state_error);
+                       broadcast_status & hoermann_state_error);
 
   update_boolean_state("prewarn", prewarn_state,
-                      broadcast_status & hoermann_state_prewarn);
+                       broadcast_status & hoermann_state_prewarn);
 
-  /* =====================================================
-     Auto correction (latch safe)
-  ===================================================== */
+  /* Auto correction */
 
   if (!auto_correction)
     return;
 
   bool error_now = broadcast_status & hoermann_state_error;
 
-  uint32_t now = millis();
-
-  if (error_now && !last_error_state)
-    error_start_time = now;
-
-  last_error_state = error_now;
-
-  if (!error_now) {
+  if (!error_now)
+  {
     auto_correction_executed = false;
     return;
   }
 
-  if ((now - error_start_time) < 3000)
+  if (!last_error_state)
+    error_start_time = now;
+
+  last_error_state = error_now;
+
+  if (now - error_start_time < 3000)
     return;
 
   if (auto_correction_executed)
@@ -147,20 +140,21 @@ void UAPBridge_esp::loop_slow() {
     set_command(true, hoermann_action_close);
 
   auto_correction_executed = true;
+
   command_latch_active = true;
-  command_latch_time = millis() + COMMAND_LATCH_MS;
+  command_latch_time = now + COMMAND_LATCH_MS;
 }
 
 /* ============================================================
    UART RECEIVE
 ============================================================ */
 
-void UAPBridge_esp::receive() {
-
+void UAPBridge_esp::receive()
+{
   bool newData = false;
 
-  while (available() > 0) {
-
+  while (available() > 0)
+  {
     for (uint8_t i = 0; i < 4; i++)
       rx_data[i] = rx_data[i + 1];
 
@@ -173,13 +167,13 @@ void UAPBridge_esp::receive() {
   if (!newData)
     return;
 
-  if (rx_data[0] == BROADCAST_ADDR) {
-
+  if (rx_data[0] == BROADCAST_ADDR)
+  {
     uint8_t length = rx_data[1] & 0x0F;
 
     if (length == 2 &&
-        calc_crc8(rx_data, length + 3) == 0x00) {
-
+        calc_crc8(rx_data, length + 3) == 0x00)
+    {
       broadcast_status =
         rx_data[2] |
         ((uint16_t)rx_data[3] << 8);
@@ -191,8 +185,8 @@ void UAPBridge_esp::receive() {
    TRANSMIT
 ============================================================ */
 
-void UAPBridge_esp::transmit() {
-
+void UAPBridge_esp::transmit()
+{
   if (rts_pin_ != nullptr)
     rts_pin_->digital_write(true);
 
@@ -219,15 +213,29 @@ void UAPBridge_esp::transmit() {
 }
 
 /* ============================================================
+   LIGHT CONTROL (LINKER FIX)
+============================================================ */
+
+void UAPBridge_esp::set_light(bool state)
+{
+  if (light_enabled == state)
+    return;
+
+  set_command(true, hoermann_action_toggle_light);
+
+  ESP_LOGD(TAG, "Light state set to %s", state ? "ON" : "OFF");
+}
+
+/* ============================================================
    STATE CHANGE
 ============================================================ */
 
-void UAPBridge_esp::handle_state_change(hoermann_state_t new_state) {
-
+void UAPBridge_esp::handle_state_change(hoermann_state_t new_state)
+{
   state = new_state;
 
-  switch (new_state) {
-
+  switch (new_state)
+  {
     case hoermann_state_open:
       state_string = "Open";
       break;
