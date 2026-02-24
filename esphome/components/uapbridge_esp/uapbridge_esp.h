@@ -52,19 +52,20 @@ class UAPBridge_esp : public esphome::uapbridge::UAPBridge {
 
  protected:
 
-  // =========================================================
-  // State
-  // =========================================================
+  /* =====================================================
+     State machine runtime
+  ===================================================== */
 
   hoermann_state_t state = hoermann_state_stopped;
-
-  hoermann_action_t next_action = hoermann_action_none;
+  hoermann_state_t candidate_state = hoermann_state_stopped;
 
   std::string state_string = "unknown";
 
-  // =========================================================
-  // Timing / Safety latch protection
-  // =========================================================
+  uint32_t candidate_state_time = 0;
+
+  /* =====================================================
+     Safety timing
+  ===================================================== */
 
   bool last_error_state = false;
   uint32_t error_start_time = 0;
@@ -74,17 +75,12 @@ class UAPBridge_esp : public esphome::uapbridge::UAPBridge {
   bool command_latch_active = false;
   uint32_t command_latch_time = 0;
 
-  hoermann_state_t candidate_state = hoermann_state_stopped;
-  uint32_t candidate_state_time = 0;
-
-  uint32_t event_suppression_until = 0;
-
   static constexpr uint32_t COMMAND_LATCH_MS = 8000;
   static constexpr uint32_t BROADCAST_STABLE_MS = 150;
 
-  // =========================================================
-  // Internal methods
-  // =========================================================
+  /* =====================================================
+     Internal methods
+  ===================================================== */
 
   void loop_fast();
   void loop_slow();
@@ -104,9 +100,9 @@ class UAPBridge_esp : public esphome::uapbridge::UAPBridge {
                             bool &current_state,
                             bool new_state);
 
-  // =========================================================
-  // Runtime variables
-  // =========================================================
+  /* =====================================================
+     Runtime variables
+  ===================================================== */
 
   uint32_t last_call = 0;
   uint32_t last_call_slow = 0;
@@ -114,7 +110,6 @@ class UAPBridge_esp : public esphome::uapbridge::UAPBridge {
   uint16_t broadcast_status = 0;
 
   bool ignore_next_event = false;
-
   bool auto_correction_in_progress = false;
 
   uint8_t rx_data[5] = {0};
@@ -124,6 +119,8 @@ class UAPBridge_esp : public esphome::uapbridge::UAPBridge {
   uint8_t byte_cnt = 0;
 
   uint32_t send_time = 0;
+
+  /* CRC table */
 
   const uint8_t crc_table[256] = {
     0x00,0x07,0x0E,0x09,0x1C,0x1B,0x12,0x15,
@@ -162,5 +159,5 @@ class UAPBridge_esp : public esphome::uapbridge::UAPBridge {
 
 };
 
-}  // namespace uapbridge_esp
-}  // namespace esphome
+} // namespace uapbridge_esp
+} // namespace esphome
