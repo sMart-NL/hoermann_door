@@ -215,14 +215,91 @@ void UAPBridge_esp::transmit() {
  * Helper to set next Command and *not* skip Current Command before end was sent
  */
 void UAPBridge_esp::set_command(bool cond, const hoermann_action_t command) {
-  if (cond) {
-    if (this->next_action != hoermann_action_none) {
-      ESP_LOGW(TAG, "Last Command was not yet fetched by modbus! -- action cached %d", this->next_action);
-    } else {
+
+  if (!cond)
+    return;
+
+  bool moving = (this->state == hoermann_state_opening ||
+                 this->state == hoermann_state_closing);
+
+  bool stopped = (this->state == hoermann_state_stopped);
+  bool open    = (this->state == hoermann_state_open);
+  bool closed  = (this->state == hoermann_state_closed);
+
+  // -------------------------------------------------
+  // 1️⃣ STOP must ALWAYS be allowed while moving
+  // -------------------------------------------------
+  if (command == hoermann_action_stop) {
+    if (moving) {
       this->next_action = command;
       this->ignore_next_event = true;
+    } else {
+      ESP_LOGW(TAG, "STOP ignored: door not moving");
     }
+    return;
   }
+
+  // -------------------------------------------------
+  // 2️⃣ Block everything except STOP while moving
+  // -------------------------------------------------
+  if (moving) {
+    ESP_LOGW(TAG, "Command BLOCKED: door moving (state=%d)", this->state);
+    return;
+  }
+
+  // -------------------------------------------------
+  // 3️⃣ Logical state validation
+  // -------------------------------------------------
+  switch (command) {
+
+    case hoermann_action_open:
+      if (!(closed || stopped)) {
+        ESP_LOGW(TAG, "OPEN blocked: invalid state=%d", this->state);
+        return;
+      }
+      break;
+
+    case hoermann_action_close:
+      if (!(open || stopped)) {
+        ESP_LOGW(TAG, "CLOSE blocked: invalid state=%d", this->state);
+        return;
+      }
+      break;
+
+    case hoermann_action_impulse:
+      // Only allow impulse when fully stable
+      if (!(open || closed || stopped)) {
+        ESP_LOGW(TAG, "IMPULSE blocked: invalid state=%d", this->state);
+        return;
+      }
+      break;
+
+    case hoermann_action_venting:
+      if (this->state == hoermann_state_venting) {
+        ESP_LOGW(TAG, "VENTING blocked: already venting");
+        return;
+      }
+      break;
+
+    default:
+      break;
+  }
+
+  // -------------------------------------------------
+  // 4️⃣ Prevent overwriting queued command
+  // -------------------------------------------------
+  if (this->next_action != hoermann_action_none) {
+    ESP_LOGW(TAG, "Command BLOCKED: previous command pending (%d)", this->next_action);
+    return;
+  }
+
+  // -------------------------------------------------
+  // 5️⃣ Accept command
+  // -------------------------------------------------
+  this->next_action = command;
+  this->ignore_next_event = true;
+
+  ESP_LOGD(TAG, "Command accepted: %d (state=%d)", command, this->state);
 }
 
 void UAPBridge_esp::action_open() {
